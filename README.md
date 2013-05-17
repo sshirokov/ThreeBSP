@@ -6,10 +6,22 @@ but ported to [CoffeeScript](http://coffeescript.org/) and cleaned up a little.
 ### Quickstart and Demo
 
 ```bash
-$ git clone $repo_url
+$ git clone https://github.com/sshirokov/ThreeBSP.git
 $ npm install .
 $ python -mSimpleHTTPServer
 Serving HTTP on 0.0.0.0 port 8000 ...
+```
+
+### Bower
+
+This package is available in the [Bower](https://github.com/bower/bower) registry.
+
+```bash
+$ bower install ThreeBSP
+bower cloning git://github.com/sshirokov/ThreeBSP.git
+bower caching git://github.com/sshirokov/ThreeBSP.git
+bower fetching ThreeBSP
+
 ```
 
 Open your browser to http://localhost:8000 and you should see something
