@@ -4,7 +4,8 @@
   "ignore": [
     "**/.*",
     "node_modules",
-    "components"
+    "components",
+    "assets/*"
   ],
   "main": "src/ThreeBSP.coffee"
 }
