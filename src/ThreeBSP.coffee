@@ -225,8 +225,9 @@ class ThreeBSP.Node
   checkTimer: =>
     return unless @start?
     return unless @options.timeout?
-    if (elapsed = (Date.now() - @start)) >= @options.timeout
-      throw new Error("Timeout reached: #{elapsed}/#{@options.timeout}ms")
+    returning (elapsed = (Date.now() - @start)), =>
+      if elapsed >= @options.timeout
+        throw new Error("Timeout reached: #{elapsed}/#{@options.timeout}ms")
 
   startTask: =>
     @start ?= Date.now()
@@ -237,10 +238,10 @@ class ThreeBSP.Node
   finishTask: =>
     throw new Error("Finished more tasks than started") if @tasks? and @tasks < 1
     @tasks -= 1
-    do @checkTimer
-    console.log "Finished task, now: #{@tasks}"
+    elapsed = @checkTimer()
+    console.log "Finished task, now: #{@tasks} [#{elapsed}/#{@options.timeout}]"
     if @tasks == 0
-      console.log "All takss finished"
+      console.log "All takss finished: #{elapsed}ms"
       @start = undefined
 
   doTask: (code) =>
@@ -257,7 +258,8 @@ class ThreeBSP.Node
     sides = front: [], back: []
     @divider ?= polygons[0].clone()
     for poly in polygons
-      @divider.subdivide poly, @polygons, @polygons, sides.front, sides.back
+      @doTask =>
+        @divider.subdivide poly, @polygons, @polygons, sides.front, sides.back
 
     for own side, polys of sides
       if polys.length
