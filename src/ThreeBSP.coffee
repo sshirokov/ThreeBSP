@@ -12,6 +12,39 @@ returning = (value, fn) ->
   fn()
   value
 
+class Timelimit
+  constructor: (@timeout=1000) -> "NOTHING"
+
+  check: =>
+    return unless @started?
+    return unless @timeout?
+    returning (elapsed = (Date.now() - @started)), =>
+      if elapsed >= @timeout
+        throw new Error("Timeout reached: #{elapsed}/#{@timeout}")
+
+  start: =>
+    @started ?= Date.now()
+    @tasks ?= 0
+    @tasks += 1
+    console.log "Starting task, now #{@tasks}"
+    do @check
+
+  finish: =>
+    throw new Error("Finished more tasks than started") if @tasks? and @tasks < 1
+    @tasks -= 1
+    elapsed = @check()
+    console.log "Finished task, now: #{@tasks} [#{elapsed}/#{@timeout}]"
+    if @tasks == 0
+      console.log "All tasks finished: #{elapsed}/#{@timeout}ms"
+      @started = undefined
+
+  doTask: (block) =>
+    do @start
+    result = block()
+    do @finish
+    result
+
+
 ##
 ## ThreBSP Driver
 #
@@ -28,6 +61,10 @@ class window.ThreeBSP
 
     console.log "Options:", @options
     console.log "Matrix:", @matrix
+
+    # Start a timer if we have a timeout
+    if @options.timeout?
+      @options.timer = new Timelimit(@options.timeout)
 
     @tree   = @toTree treeIsh
 
@@ -222,48 +259,25 @@ class ThreeBSP.Node
     node.back     = @back?.clone()
     node.options  = @options
 
-  checkTimer: =>
-    return unless @start?
-    return unless @options.timeout?
-    returning (elapsed = (Date.now() - @start)), =>
-      if elapsed >= @options.timeout
-        throw new Error("Timeout reached: #{elapsed}/#{@options.timeout}ms")
-
-  startTask: =>
-    @start ?= Date.now()
-    @tasks ?= 0
-    @tasks += 1
-    console.log "Started task, now: #{@tasks}"
-
-  finishTask: =>
-    throw new Error("Finished more tasks than started") if @tasks? and @tasks < 1
-    @tasks -= 1
-    elapsed = @checkTimer()
-    console.log "Finished task, now: #{@tasks} [#{elapsed}/#{@options.timeout}]"
-    if @tasks == 0
-      console.log "All takss finished: #{elapsed}ms"
-      @start = undefined
-
-  doTask: (code) =>
-    do @startTask
-    do code
-    do @finishTask
-
   constructor: (polygons, @options={}) ->
+    if polygons? and not (polygons instanceof Array)
+      @options = polygons
+      polygons = undefined
+
     @polygons = []
-    @doTask =>
+    @options?.timer?.doTask? =>
       @build(polygons) if polygons? and polygons.length
 
   build: (polygons) => returning this, =>
     sides = front: [], back: []
     @divider ?= polygons[0].clone()
     for poly in polygons
-      @doTask =>
+      @options?.timer?.doTask? =>
         @divider.subdivide poly, @polygons, @polygons, sides.front, sides.back
 
     for own side, polys of sides
       if polys.length
-        @[side] ?= new ThreeBSP.Node()
+        @[side] ?= new ThreeBSP.Node(@options)
         @[side].build polys
 
   isConvex: (polys) =>
