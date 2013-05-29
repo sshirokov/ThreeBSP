@@ -57,7 +57,7 @@ class window.ThreeBSP
             vertex.applyMatrix4 @matrix
             polygon.vertices.push vertex
         polygons.push polygon.calculateProperties()
-    new ThreeBSP.Node polygons
+    new ThreeBSP.Node polygons, @options
 
   # Converters/Exporters
   toMesh: (material=new THREE.MeshNormalMaterial()) =>
@@ -220,10 +220,38 @@ class ThreeBSP.Node
     node.polygons = (p.clone() for p in @polygons)
     node.front    = @front?.clone()
     node.back     = @back?.clone()
+    node.options  = @options
 
-  constructor: (polygons) ->
+  checkTimer: =>
+    return unless @start?
+    return unless @options.timeout?
+    if (elapsed = (Date.now() - @start)) >= @options.timeout
+      throw new Error("Timeout reached: #{elapsed}/#{@options.timeout}ms")
+
+  startTask: =>
+    @start ?= Date.now()
+    @tasks ?= 0
+    @tasks += 1
+    console.log "Started task, now: #{@tasks}"
+
+  finishTask: =>
+    throw new Error("Finished more tasks than started") if @tasks? and @tasks < 1
+    @tasks -= 1
+    do @checkTimer
+    console.log "Finished task, now: #{@tasks}"
+    if @tasks == 0
+      console.log "All takss finished"
+      @start = undefined
+
+  doTask: (code) =>
+    do @startTask
+    do code
+    do @finishTask
+
+  constructor: (polygons, @options={}) ->
     @polygons = []
-    @build(polygons) if polygons? and polygons.length
+    @doTask =>
+      @build(polygons) if polygons? and polygons.length
 
   build: (polygons) => returning this, =>
     sides = front: [], back: []
