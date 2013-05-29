@@ -18,8 +18,17 @@ returning = (value, fn) ->
 # Can be instantiated with THREE.Geometry,
 # THREE.Mesh or a ThreeBSP.Node
 class window.ThreeBSP
-  constructor: (treeIsh, @matrix) ->
+  constructor: (treeIsh, @matrix, @options={}) ->
+    if @matrix? and not (@matrix instanceof THREE.Matrix4)
+      @options = @matrix
+      @matrix = undefined
+
+    @options ?= {}
     @matrix ?= new THREE.Matrix4()
+
+    console.log "Options:", @options
+    console.log "Matrix:", @matrix
+
     @tree   = @toTree treeIsh
 
   toTree: (treeIsh) =>
