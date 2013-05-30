@@ -13,7 +13,7 @@ returning = (value, fn) ->
   value
 
 class Timelimit
-  constructor: (@timeout=1000) -> "NOTHING"
+  constructor: (@timeout) -> "NOTHING"
 
   check: =>
     return unless @started?
@@ -26,16 +26,13 @@ class Timelimit
     @started ?= Date.now()
     @tasks ?= 0
     @tasks += 1
-    console.log "Starting task, now #{@tasks}"
     do @check
 
   finish: =>
     throw new Error("Finished more tasks than started") if @tasks? and @tasks < 1
     @tasks -= 1
     elapsed = @check()
-    console.log "Finished task, now: #{@tasks} [#{elapsed}/#{@timeout}]"
     if @tasks == 0
-      console.log "All tasks finished: #{elapsed}/#{@timeout}ms"
       @started = undefined
 
   doTask: (block) =>
@@ -59,12 +56,8 @@ class window.ThreeBSP
     @options ?= {}
     @matrix ?= new THREE.Matrix4()
 
-    console.log "Options:", @options
-    console.log "Matrix:", @matrix
-
-    # Start a timer if we have a timeout
-    if @options.timeout?
-      @options.timer = new Timelimit(@options.timeout)
+    # Start a timer if one wasn't passed
+    @options.timer ?= new Timelimit(@options.timeout)
 
     @tree   = @toTree treeIsh
 
@@ -118,7 +111,7 @@ class window.ThreeBSP
           geometry.faceVertexUvs[0].push vertUvs
 
   # CSG Operations
-  subtract: (other) =>
+  subtract: (other) => @options.timer.doTask =>
     [us, them] = [@tree.clone(), other.tree.clone()]
     us
       .invert()
@@ -252,12 +245,12 @@ class ThreeBSP.Polygon
 ##
 ## ThreeBSP.Node
 class ThreeBSP.Node
-  clone: => returning (node = new ThreeBSP.Node()), =>
+  clone: => returning (node = new ThreeBSP.Node(@options)), =>
     node.divider  = @divider?.clone()
-    node.polygons = (p.clone() for p in @polygons)
-    node.front    = @front?.clone()
-    node.back     = @back?.clone()
-    node.options  = @options
+    node.polygons = @options.timer.doTask => (p.clone() for p in @polygons)
+    node.front    = @options.timer.doTask => @front?.clone()
+    node.back     = @options.timer.doTask => @back?.clone()
+
 
   constructor: (polygons, @options={}) ->
     if polygons? and not (polygons instanceof Array)
@@ -265,15 +258,17 @@ class ThreeBSP.Node
       polygons = undefined
 
     @polygons = []
-    @options?.timer?.doTask? =>
+    @options.timer.doTask =>
       @build(polygons) if polygons? and polygons.length
 
   build: (polygons) => returning this, =>
     sides = front: [], back: []
     @divider ?= polygons[0].clone()
-    for poly in polygons
-      @options?.timer?.doTask? =>
-        @divider.subdivide poly, @polygons, @polygons, sides.front, sides.back
+
+    @options.timer.doTask =>
+      for poly in polygons
+        @options.timer.doTask =>
+          @divider.subdivide poly, @polygons, @polygons, sides.front, sides.back
 
     for own side, polys of sides
       if polys.length
