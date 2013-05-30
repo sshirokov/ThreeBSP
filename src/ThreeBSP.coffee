@@ -34,6 +34,7 @@ class Timelimit
     @done ?= 0
     @done += 1
     if @tasks == 0
+      "Finished #{@done} tasks in #{elapsed}/#{@timeout} ms"
       @started = @done = undefined
 
   doTask: (block) =>
@@ -292,32 +293,33 @@ class ThreeBSP.Node
         return false if inner != outer and outer.classifySide(inner) != BACK
     true
 
-  allPolygons: =>
+  allPolygons: => @options.timer.doTask =>
     @polygons.slice()
       .concat(@front?.allPolygons() or [])
       .concat(@back?.allPolygons() or [])
 
-  invert: => returning this, =>
+  invert: => returning this, => @options.timer.doTask =>
     for poly in @polygons
-      do poly.invert
+      @options.timer.doTask => do poly.invert
     for flipper in [@divider, @front, @back]
-      flipper?.invert()
+      @options.timer.doTask => flipper?.invert()
     [@front, @back] = [@back, @front]
 
-  clipPolygons: (polygons) =>
+  clipPolygons: (polygons) => @options.timer.doTask =>
     return polygons.slice() unless @divider
     front = []
     back = []
 
     for poly in polygons
-      @divider.subdivide poly, front, back, front, back
+      @options.timer.doTask =>
+        @divider.subdivide poly, front, back, front, back
 
     front = @front.clipPolygons front if @front
     back  = @back.clipPolygons  back  if @back
 
     return front.concat if @back then back else []
 
-  clipTo: (node) => returning this, =>
+  clipTo: (node) => returning this, => @options.timer.doTask =>
     @polygons = node.clipPolygons @polygons
     @front?.clipTo node
     @back?.clipTo node
