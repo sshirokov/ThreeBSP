@@ -19,7 +19,7 @@ class Timelimit
     return unless @started?
     returning (elapsed = (Date.now() - @started)), =>
       if elapsed >= @timeout ? Infinity
-        throw new Error("Timeout reached: #{elapsed}/#{@timeout}")
+        throw new Error("Timeout reached: #{elapsed}/#{@timeout}, #{@tasks ? 0} tasks unfinished #{@done ? 0} finished.")
 
   start: =>
     @started ?= Date.now()
@@ -34,7 +34,6 @@ class Timelimit
     @done ?= 0
     @done += 1
     if @tasks == 0
-      console.log "All #{@done} tasks finished. #{elapsed}/#{@timeout ? 'Inf'}ms"
       @started = @done = undefined
 
   doTask: (block) =>
