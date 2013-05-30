@@ -143,7 +143,7 @@ class window.ThreeBSP
       .invert()
       .clipTo(us)
       .invert()
-    new ThreeBSP us.build(them.allPolygons()), @matrix
+    new ThreeBSP us.build(them.allPolygons()), @matrix, @options
 
   intersect: (other) => @options.timer.doTask => other.withTimer @options.timer, =>
     [us, them] = [@tree.clone(), other.tree.clone()]
@@ -151,7 +151,7 @@ class window.ThreeBSP
       .clipTo(us.invert())
       .invert()
       .clipTo(us.clipTo(them))
-    new ThreeBSP us.build(them.allPolygons()).invert(), @matrix
+    new ThreeBSP us.build(them.allPolygons()).invert(), @matrix, @options
 
 
 ##
