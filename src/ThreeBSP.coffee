@@ -12,15 +12,72 @@ returning = (value, fn) ->
   fn()
   value
 
+class Timelimit
+  constructor: (@timeout, @progress) -> "NOTHING"
+
+  check: =>
+    return unless @started?
+    returning (elapsed = (Date.now() - @started)), =>
+      if elapsed >= @timeout ? Infinity
+        throw new Error("Timeout reached: #{elapsed}/#{@timeout}, #{@tasks ? 0} tasks unfinished #{@done ? 0} finished.")
+
+  start: =>
+    @started ?= Date.now()
+    @tasks ?= 0
+    @total ?= 0
+    @total += 1
+    @tasks += 1
+    do @check
+
+  finish: =>
+    throw new Error("Finished more tasks than started") if @tasks? and @tasks < 1
+    @tasks -= 1
+    elapsed = @check()
+    @done ?= 0
+    @done += 1
+    @progress(@done, @total) if @progress?
+    if @tasks == 0
+      "Finished #{@done} tasks in #{elapsed}/#{@timeout} ms"
+      @started = @done = @total = undefined
+
+  doTask: (block) =>
+    do @start
+    result = block()
+    do @finish
+    result
+
+
 ##
 ## ThreBSP Driver
 #
 # Can be instantiated with THREE.Geometry,
 # THREE.Mesh or a ThreeBSP.Node
 class window.ThreeBSP
-  constructor: (treeIsh, @matrix) ->
+  constructor: (treeIsh, @matrix, @options={}) ->
+    if @matrix? and not (@matrix instanceof THREE.Matrix4)
+      @options = @matrix
+      @matrix = undefined
+
+    @options ?= {}
     @matrix ?= new THREE.Matrix4()
+
+    # Start a timer if one wasn't passed
+    @options.timer ?= new Timelimit(
+      @options.timer?.timeout ? @options.timeout
+      @options.timer?.progress ? @options.progress
+    )
+
     @tree   = @toTree treeIsh
+
+  # Evaluate block after replacing @timer with new_timer
+  # then put @timer back after block returns
+  withTimer: (new_timer, block) =>
+    old_timer = @options.timer
+    try
+      @options.timer = new_timer
+      do block
+    finally
+      @options.timer = old_timer
 
   toTree: (treeIsh) =>
     return treeIsh if treeIsh instanceof ThreeBSP.Node
@@ -48,31 +105,32 @@ class window.ThreeBSP
             vertex.applyMatrix4 @matrix
             polygon.vertices.push vertex
         polygons.push polygon.calculateProperties()
-    new ThreeBSP.Node polygons
+    new ThreeBSP.Node polygons, @options
 
   # Converters/Exporters
-  toMesh: (material=new THREE.MeshNormalMaterial()) =>
+  toMesh: (material=new THREE.MeshNormalMaterial()) => @options.timer.doTask =>
     geometry = @toGeometry()
     returning (mesh = new THREE.Mesh geometry, material), =>
       mesh.position.getPositionFromMatrix @matrix
       mesh.rotation.setEulerFromRotationMatrix @matrix
 
-  toGeometry: () =>
+  toGeometry: () => @options.timer.doTask =>
     matrix = new THREE.Matrix4().getInverse @matrix
 
     returning (geometry = new THREE.Geometry()), =>
       for polygon in @tree.allPolygons()
-        polyVerts = (v.clone().applyMatrix4(matrix) for v in polygon.vertices)
-        for idx in [2...polyVerts.length]
-          verts = [polyVerts[0], polyVerts[idx-1], polyVerts[idx]]
-          vertUvs = (new THREE.Vector2(v.uv?.x, v.uv?.y) for v in verts)
+        @options.timer.doTask =>
+          polyVerts = (v.clone().applyMatrix4(matrix) for v in polygon.vertices)
+          for idx in [2...polyVerts.length]
+            verts = [polyVerts[0], polyVerts[idx-1], polyVerts[idx]]
+            vertUvs = (new THREE.Vector2(v.uv?.x, v.uv?.y) for v in verts)
 
-          face = new THREE.Face3 (geometry.vertices.push(v) - 1 for v in verts)..., polygon.normal.clone()
-          geometry.faces.push face
-          geometry.faceVertexUvs[0].push vertUvs
+            face = new THREE.Face3 (geometry.vertices.push(v) - 1 for v in verts)..., polygon.normal.clone()
+            geometry.faces.push face
+            geometry.faceVertexUvs[0].push vertUvs
 
   # CSG Operations
-  subtract: (other) =>
+  subtract: (other) => @options.timer.doTask => other.withTimer @options.timer, =>
     [us, them] = [@tree.clone(), other.tree.clone()]
     us
       .invert()
@@ -82,9 +140,9 @@ class window.ThreeBSP
       .invert()
       .clipTo(us)
       .invert()
-    new ThreeBSP us.build(them.allPolygons()).invert(), @matrix
+    new ThreeBSP us.build(them.allPolygons()).invert(), @matrix, @options
 
-  union: (other) =>
+  union: (other) => @options.timer.doTask => other.withTimer @options.timer, =>
     [us, them] = [@tree.clone(), other.tree.clone()]
     us.clipTo them
     them
@@ -92,15 +150,15 @@ class window.ThreeBSP
       .invert()
       .clipTo(us)
       .invert()
-    new ThreeBSP us.build(them.allPolygons()), @matrix
+    new ThreeBSP us.build(them.allPolygons()), @matrix, @options
 
-  intersect: (other) =>
+  intersect: (other) => @options.timer.doTask => other.withTimer @options.timer, =>
     [us, them] = [@tree.clone(), other.tree.clone()]
     them
       .clipTo(us.invert())
       .invert()
       .clipTo(us.clipTo(them))
-    new ThreeBSP us.build(them.allPolygons()).invert(), @matrix
+    new ThreeBSP us.build(them.allPolygons()).invert(), @matrix, @options
 
 
 ##
@@ -206,25 +264,33 @@ class ThreeBSP.Polygon
 ##
 ## ThreeBSP.Node
 class ThreeBSP.Node
-  clone: => returning (node = new ThreeBSP.Node()), =>
+  clone: => returning (node = new ThreeBSP.Node(@options)), =>
     node.divider  = @divider?.clone()
-    node.polygons = (p.clone() for p in @polygons)
-    node.front    = @front?.clone()
-    node.back     = @back?.clone()
+    node.polygons = @options.timer.doTask => (p.clone() for p in @polygons)
+    node.front    = @options.timer.doTask => @front?.clone()
+    node.back     = @options.timer.doTask => @back?.clone()
 
-  constructor: (polygons) ->
+  constructor: (polygons, @options={}) ->
+    if polygons? and not (polygons instanceof Array)
+      @options = polygons
+      polygons = undefined
+
     @polygons = []
-    @build(polygons) if polygons? and polygons.length
+    @options.timer.doTask =>
+      @build(polygons) if polygons? and polygons.length
 
   build: (polygons) => returning this, =>
     sides = front: [], back: []
     @divider ?= polygons[0].clone()
-    for poly in polygons
-      @divider.subdivide poly, @polygons, @polygons, sides.front, sides.back
+
+    @options.timer.doTask =>
+      for poly in polygons
+        @options.timer.doTask =>
+          @divider.subdivide poly, @polygons, @polygons, sides.front, sides.back
 
     for own side, polys of sides
       if polys.length
-        @[side] ?= new ThreeBSP.Node()
+        @[side] ?= new ThreeBSP.Node(@options)
         @[side].build polys
 
   isConvex: (polys) =>
@@ -233,32 +299,33 @@ class ThreeBSP.Node
         return false if inner != outer and outer.classifySide(inner) != BACK
     true
 
-  allPolygons: =>
+  allPolygons: => @options.timer.doTask =>
     @polygons.slice()
       .concat(@front?.allPolygons() or [])
       .concat(@back?.allPolygons() or [])
 
-  invert: => returning this, =>
+  invert: => returning this, => @options.timer.doTask =>
     for poly in @polygons
-      do poly.invert
+      @options.timer.doTask => do poly.invert
     for flipper in [@divider, @front, @back]
-      flipper?.invert()
+      @options.timer.doTask => flipper?.invert()
     [@front, @back] = [@back, @front]
 
-  clipPolygons: (polygons) =>
+  clipPolygons: (polygons) => @options.timer.doTask =>
     return polygons.slice() unless @divider
     front = []
     back = []
 
     for poly in polygons
-      @divider.subdivide poly, front, back, front, back
+      @options.timer.doTask =>
+        @divider.subdivide poly, front, back, front, back
 
     front = @front.clipPolygons front if @front
     back  = @back.clipPolygons  back  if @back
 
     return front.concat if @back then back else []
 
-  clipTo: (node) => returning this, =>
+  clipTo: (node) => returning this, => @options.timer.doTask =>
     @polygons = node.clipPolygons @polygons
     @front?.clipTo node
     @back?.clipTo node
