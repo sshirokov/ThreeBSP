@@ -17,9 +17,8 @@ class Timelimit
 
   check: =>
     return unless @started?
-    return unless @timeout?
     returning (elapsed = (Date.now() - @started)), =>
-      if elapsed >= @timeout
+      if elapsed >= @timeout ? Infinity
         throw new Error("Timeout reached: #{elapsed}/#{@timeout}")
 
   start: =>
@@ -32,8 +31,11 @@ class Timelimit
     throw new Error("Finished more tasks than started") if @tasks? and @tasks < 1
     @tasks -= 1
     elapsed = @check()
+    @done ?= 0
+    @done += 1
     if @tasks == 0
-      @started = undefined
+      console.log "All #{@done} tasks finished. #{elapsed}/#{@timeout ? 'Inf'}ms"
+      @started = @done = undefined
 
   doTask: (block) =>
     do @start
@@ -57,7 +59,7 @@ class window.ThreeBSP
     @matrix ?= new THREE.Matrix4()
 
     # Start a timer if one wasn't passed
-    @options.timer ?= new Timelimit(@options.timeout)
+    @options.timer ?= new Timelimit(@options.timer?.timeout ? @options.timeout)
 
     @tree   = @toTree treeIsh
 
@@ -250,6 +252,8 @@ class ThreeBSP.Node
     node.polygons = @options.timer.doTask => (p.clone() for p in @polygons)
     node.front    = @options.timer.doTask => @front?.clone()
     node.back     = @options.timer.doTask => @back?.clone()
+
+
 
 
   constructor: (polygons, @options={}) ->
