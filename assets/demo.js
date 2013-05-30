@@ -33,7 +33,7 @@ document.addEventListener("DOMContentLoaded", setTimeout(function() {
 		cube_mesh.position.x = -7;
 		var start, stop;
 		start = Date.now();
-		var cube_bsp = new ThreeBSP( cube_mesh, {timeout: 1000} );
+		var cube_bsp = new ThreeBSP( cube_mesh, {timeout: 2000} );
 		stop = Date.now();
 		console.log("Elapsed(build cube): ", stop - start);
 
@@ -42,7 +42,7 @@ document.addEventListener("DOMContentLoaded", setTimeout(function() {
 		var sphere_mesh = new THREE.Mesh( sphere_geometry );
 		sphere_mesh.position.x = -7;
 		start = Date.now();
-		var sphere_bsp = new ThreeBSP( sphere_mesh, {timeout: 2000} );
+		var sphere_bsp = new ThreeBSP( sphere_mesh, {timeout: 3000} );
 		stop = Date.now();
 		console.log("Elapsed(build sphere): ", stop - start);
 
