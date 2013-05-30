@@ -13,7 +13,7 @@ returning = (value, fn) ->
   value
 
 class Timelimit
-  constructor: (@timeout) -> "NOTHING"
+  constructor: (@timeout, @progress) -> "NOTHING"
 
   check: =>
     return unless @started?
@@ -24,6 +24,8 @@ class Timelimit
   start: =>
     @started ?= Date.now()
     @tasks ?= 0
+    @total ?= 0
+    @total += 1
     @tasks += 1
     do @check
 
@@ -33,9 +35,10 @@ class Timelimit
     elapsed = @check()
     @done ?= 0
     @done += 1
+    @progress(@done, @total) if @progress?
     if @tasks == 0
       "Finished #{@done} tasks in #{elapsed}/#{@timeout} ms"
-      @started = @done = undefined
+      @started = @done = @total = undefined
 
   doTask: (block) =>
     do @start
@@ -59,7 +62,10 @@ class window.ThreeBSP
     @matrix ?= new THREE.Matrix4()
 
     # Start a timer if one wasn't passed
-    @options.timer ?= new Timelimit(@options.timer?.timeout ? @options.timeout)
+    @options.timer ?= new Timelimit(
+      @options.timer?.timeout ? @options.timeout
+      @options.timer?.progress ? @options.progress
+    )
 
     @tree   = @toTree treeIsh
 
