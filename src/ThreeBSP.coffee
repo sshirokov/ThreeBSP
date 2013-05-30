@@ -63,6 +63,16 @@ class window.ThreeBSP
 
     @tree   = @toTree treeIsh
 
+  # Evaluate block after replacing @timer with new_timer
+  # then put @timer back after block returns
+  withTimer: (new_timer, block) =>
+    old_timer = @options.timer
+    try
+      @options.timer = new_timer
+      do block
+    finally
+      @options.timer = old_timer
+
   toTree: (treeIsh) =>
     return treeIsh if treeIsh instanceof ThreeBSP.Node
     polygons = []
