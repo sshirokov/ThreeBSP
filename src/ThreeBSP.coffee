@@ -102,25 +102,26 @@ class window.ThreeBSP
     new ThreeBSP.Node polygons, @options
 
   # Converters/Exporters
-  toMesh: (material=new THREE.MeshNormalMaterial()) =>
+  toMesh: (material=new THREE.MeshNormalMaterial()) => @options.timer.doTask =>
     geometry = @toGeometry()
     returning (mesh = new THREE.Mesh geometry, material), =>
       mesh.position.getPositionFromMatrix @matrix
       mesh.rotation.setEulerFromRotationMatrix @matrix
 
-  toGeometry: () =>
+  toGeometry: () => @options.timer.doTask =>
     matrix = new THREE.Matrix4().getInverse @matrix
 
     returning (geometry = new THREE.Geometry()), =>
       for polygon in @tree.allPolygons()
-        polyVerts = (v.clone().applyMatrix4(matrix) for v in polygon.vertices)
-        for idx in [2...polyVerts.length]
-          verts = [polyVerts[0], polyVerts[idx-1], polyVerts[idx]]
-          vertUvs = (new THREE.Vector2(v.uv?.x, v.uv?.y) for v in verts)
+        @options.timer.doTask =>
+          polyVerts = (v.clone().applyMatrix4(matrix) for v in polygon.vertices)
+          for idx in [2...polyVerts.length]
+            verts = [polyVerts[0], polyVerts[idx-1], polyVerts[idx]]
+            vertUvs = (new THREE.Vector2(v.uv?.x, v.uv?.y) for v in verts)
 
-          face = new THREE.Face3 (geometry.vertices.push(v) - 1 for v in verts)..., polygon.normal.clone()
-          geometry.faces.push face
-          geometry.faceVertexUvs[0].push vertUvs
+            face = new THREE.Face3 (geometry.vertices.push(v) - 1 for v in verts)..., polygon.normal.clone()
+            geometry.faces.push face
+            geometry.faceVertexUvs[0].push vertUvs
 
   # CSG Operations
   subtract: (other) => @options.timer.doTask => other.withTimer @options.timer, =>
@@ -135,7 +136,7 @@ class window.ThreeBSP
       .invert()
     new ThreeBSP us.build(them.allPolygons()).invert(), @matrix, @options
 
-  union: (other) =>
+  union: (other) => @options.timer.doTask => other.withTimer @options.timer, =>
     [us, them] = [@tree.clone(), other.tree.clone()]
     us.clipTo them
     them
@@ -145,7 +146,7 @@ class window.ThreeBSP
       .invert()
     new ThreeBSP us.build(them.allPolygons()), @matrix
 
-  intersect: (other) =>
+  intersect: (other) => @options.timer.doTask => other.withTimer @options.timer, =>
     [us, them] = [@tree.clone(), other.tree.clone()]
     them
       .clipTo(us.invert())
