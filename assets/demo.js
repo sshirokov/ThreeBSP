@@ -33,7 +33,14 @@ document.addEventListener("DOMContentLoaded", setTimeout(function() {
 		cube_mesh.position.x = -7;
 		var start, stop;
 		start = Date.now();
-		var cube_bsp = new ThreeBSP( cube_mesh, {timeout: 2000} );
+		p = {};
+		var cube_bsp = new ThreeBSP( cube_mesh, {timeout: 2000, progress: function(c,t) {
+		  percent = Math.round(c/t * 100)
+		  if(p['P' + percent] === undefined) {
+			p['P' + percent] = true;
+			console.log(percent + "%");
+		  }
+		}});
 		stop = Date.now();
 		console.log("Elapsed(build cube): ", stop - start);
 
