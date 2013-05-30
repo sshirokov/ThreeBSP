@@ -123,7 +123,7 @@ class window.ThreeBSP
           geometry.faceVertexUvs[0].push vertUvs
 
   # CSG Operations
-  subtract: (other) => @options.timer.doTask =>
+  subtract: (other) => @options.timer.doTask => other.withTimer @options.timer, =>
     [us, them] = [@tree.clone(), other.tree.clone()]
     us
       .invert()
@@ -133,7 +133,7 @@ class window.ThreeBSP
       .invert()
       .clipTo(us)
       .invert()
-    new ThreeBSP us.build(them.allPolygons()).invert(), @matrix
+    new ThreeBSP us.build(them.allPolygons()).invert(), @matrix, @options
 
   union: (other) =>
     [us, them] = [@tree.clone(), other.tree.clone()]
@@ -262,9 +262,6 @@ class ThreeBSP.Node
     node.polygons = @options.timer.doTask => (p.clone() for p in @polygons)
     node.front    = @options.timer.doTask => @front?.clone()
     node.back     = @options.timer.doTask => @back?.clone()
-
-
-
 
   constructor: (polygons, @options={}) ->
     if polygons? and not (polygons instanceof Array)
