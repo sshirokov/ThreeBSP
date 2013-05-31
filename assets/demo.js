@@ -31,15 +31,37 @@ document.addEventListener("DOMContentLoaded", setTimeout(function() {
 		var cube_geometry = new THREE.CubeGeometry( 3, 3, 3 );
 		var cube_mesh = new THREE.Mesh( cube_geometry );
 		cube_mesh.position.x = -7;
-		var cube_bsp = new ThreeBSP( cube_mesh );
+		var start, stop;
+		start = Date.now();
+		p = {};
+		var cube_bsp = new ThreeBSP( cube_mesh, {timeout: 2000, progress: function(c,t) {
+		  percent = Math.round(c/t * 100)
+		  if(p['P' + percent] === undefined) {
+			p['P' + percent] = true;
+			console.log(percent + "%");
+		  }
+		}});
+		stop = Date.now();
+		console.log("Elapsed(build cube): ", stop - start);
+
 
 		var sphere_geometry = new THREE.SphereGeometry( 1.8, 32, 32 );
 		var sphere_mesh = new THREE.Mesh( sphere_geometry );
 		sphere_mesh.position.x = -7;
-		var sphere_bsp = new ThreeBSP( sphere_mesh );
+		start = Date.now();
+		var sphere_bsp = new ThreeBSP( sphere_mesh, {timeout: 3000} );
+		stop = Date.now();
+		console.log("Elapsed(build sphere): ", stop - start);
 
+
+		start = Date.now();
 		var subtract_bsp = cube_bsp.subtract( sphere_bsp );
+		stop = Date.now();
+		console.log("Elapsed(cube - sphere): ", stop - start);
+		start = Date.now();
 		var result = subtract_bsp.toMesh( new THREE.MeshLambertMaterial({ shading: THREE.SmoothShading, map: THREE.ImageUtils.loadTexture('assets/texture.png') }) );
+		stop = Date.now();
+		console.log("Elapsed(toMesh): ", stop - start);
 		result.geometry.computeVertexNormals();
 		scene.add( result );
 
