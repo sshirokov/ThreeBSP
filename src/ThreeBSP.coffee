@@ -323,7 +323,10 @@ class ThreeBSP.Node
     front = @front.clipPolygons front if @front
     back  = @back.clipPolygons  back  if @back
 
-    return front.concat if @back then back else []
+    if @back
+      return front.concat back
+    else
+      return front
 
   clipTo: (node) => returning this, => @options.timer.doTask =>
     @polygons = node.clipPolygons @polygons
